@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+echo '+cargo clippy --fix --allow-staged --allow-dirty'
+cargo clippy --fix --allow-staged --allow-dirty
+echo '+cargo clippy --all'
+cargo clippy --all
+
+
