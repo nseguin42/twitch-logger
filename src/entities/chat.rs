@@ -17,12 +17,12 @@ impl Display for ChatMessage {
 }
 
 impl ChatMessage {
-    pub fn new(channel: String, username: String, message: String) -> Self {
+    pub fn new(channel: String, username: String, message: String, sent_at: DateTime<Utc>) -> Self {
         Self {
             channel,
             username,
             message,
-            sent_at: Utc::now(),
+            sent_at,
         }
     }
 }
@@ -33,6 +33,7 @@ impl From<twitch_irc::message::PrivmsgMessage> for ChatMessage {
             message.channel_login,
             message.sender.login,
             message.message_text,
+            message.server_timestamp,
         )
     }
 }
