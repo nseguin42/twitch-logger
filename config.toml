@@ -1,4 +1,0 @@
-env_prefix = "TWITCH"
-env_file = ".env"
-
-[channel.kogasapls]

@@ -1,3 +1,5 @@
+use crate::config::Config;
+use crate::error::Error;
 use crate::logger::value_logger::ValueLogger;
 use log::error;
 use std::fs::OpenOptions;
@@ -27,7 +29,20 @@ impl FileLogger {
 }
 
 impl ValueLogger<&str> for FileLogger {
-    fn log(&self, message: &str) {
+    fn log(&mut self, message: &str) {
         self.append_line(message);
+    }
+}
+
+impl TryFrom<&Config> for FileLogger {
+    type Error = Error;
+
+    fn try_from(config: &Config) -> Result<Self, Self::Error> {
+        if config.log_file.is_none() {
+            return Err(Error::MissingConfig("log_file".to_string()));
+        }
+
+        let path = config.log_file.clone().unwrap();
+        Ok(Self::new(path))
     }
 }

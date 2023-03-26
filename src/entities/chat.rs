@@ -5,22 +5,22 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub channel: String,
-    pub sender: String,
+    pub username: String,
     pub message: String,
     pub sent_at: DateTime<Utc>,
 }
 
 impl Display for ChatMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[#{}] {}: {}", self.channel, self.sender, self.message)
+        write!(f, "[#{}] {}: {}", self.channel, self.username, self.message)
     }
 }
 
 impl ChatMessage {
-    pub fn new(channel: String, sender: String, message: String) -> Self {
+    pub fn new(channel: String, username: String, message: String) -> Self {
         Self {
             channel,
-            sender,
+            username,
             message,
             sent_at: Utc::now(),
         }

@@ -9,16 +9,15 @@ use twitch_irc::{ClientConfig, SecureTCPTransport};
 use utils::env::EnvStorage;
 
 pub struct Client {
-    pub config: Config,
+    channels: Vec<String>,
     env: EnvStorage,
     irc: Option<TwitchIRCClient<SecureTCPTransport, RefreshingLoginCredentials<EnvStorage>>>,
 }
 
 impl Client {
-    pub fn new(config: Config) -> Self {
-        let env = EnvStorage::from(&config);
+    pub fn new(channels: Vec<String>, env: EnvStorage) -> Self {
         Self {
-            config,
+            channels,
             env,
             irc: None,
         }
@@ -42,8 +41,7 @@ impl Client {
         });
 
         let irc = self.irc.as_mut().unwrap();
-        let channels = self.config.channels.as_ref().unwrap();
-        for channel in channels.keys() {
+        for channel in &self.channels {
             irc.join(channel.to_string()).unwrap();
         }
         join_handle.await.unwrap();
@@ -65,4 +63,12 @@ fn build_irc_config(
     Ok(ClientConfig::new_simple(
         RefreshingLoginCredentials::init_with_username(username, client_id, client_secret, env),
     ))
+}
+
+impl From<&Config> for Client {
+    fn from(config: &Config) -> Self {
+        let env = EnvStorage::from(config);
+        let channels = config.channels.clone().unwrap().keys().cloned().collect();
+        Self::new(channels, env)
+    }
 }

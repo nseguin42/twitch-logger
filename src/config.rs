@@ -11,7 +11,10 @@ pub struct Config {
     pub env_prefix: Option<String>,
     pub env_file: Option<PathBuf>,
     pub channels: Option<HashMap<String, ChannelConfig>>,
+    pub log_file: Option<PathBuf>,
+    pub log_level: Option<String>,
     pub db_url: Option<String>,
+    pub db_table: Option<String>,
 }
 
 impl Config {
@@ -22,7 +25,10 @@ impl Config {
             env_prefix: config.get("env_prefix").unwrap_or_default(),
             env_file: config.get("env_file").unwrap_or_default(),
             channels: config.get("channel").unwrap_or_default(),
+            log_file: config.get("log_file").unwrap_or_default(),
+            log_level: config.get("log_level").unwrap_or_default(),
             db_url: config.get("db_url").unwrap_or_default(),
+            db_table: config.get("db_table").unwrap_or_default(),
         }
     }
 

@@ -1,26 +1,34 @@
+use tokio_postgres::Error as PostgresError;
+
 #[derive(Debug)]
 pub enum Error {
-    Env(String),
+    MissingEnv(String),
     Other(String),
-    Parse {
+    FailedToParse {
         key: String,
         value: String,
         error: Option<String>,
     },
+    MissingConfig(String),
+    InvalidConfig(String),
+    Database(PostgresError),
     Unspecified,
 }
 
 impl Error {
     fn description(&self) -> String {
         match self {
-            Error::Env(s) => format!("Missing environment variable: {}", s),
-            Error::Parse { key, value, error } => {
+            Error::FailedToParse { key, value, error } => {
                 let mut s = format!("Failed to parse {} as {}", value, key);
                 if let Some(e) = error {
                     s.push_str(&format!(": {}", e));
                 }
                 s
             }
+            Error::MissingEnv(s) => format!("Missing environment variable: {}", s),
+            Error::MissingConfig(s) => format!("Missing config value: {}", s),
+            Error::InvalidConfig(s) => format!("Invalid config value: {}", s),
+            Error::Database(e) => e.to_string(),
             Error::Other(s) => s.to_string(),
             Error::Unspecified => "Unspecified error, please report this".to_string(),
         }
@@ -43,7 +51,13 @@ impl From<&dyn std::error::Error> for Error {
 
 impl From<std::env::VarError> for Error {
     fn from(e: std::env::VarError) -> Self {
-        Error::Env(e.to_string())
+        Error::MissingEnv(e.to_string())
+    }
+}
+
+impl From<PostgresError> for Error {
+    fn from(e: PostgresError) -> Self {
+        Error::Database(e)
     }
 }
 

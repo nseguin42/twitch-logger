@@ -16,7 +16,7 @@ const LINE_ENDING: &'static str = "\r\n";
 const LINE_ENDING: &str = "\n";
 
 #[derive(Debug, Clone)]
-pub(crate) struct EnvStorage {
+pub struct EnvStorage {
     env_file_path: Option<PathBuf>,
     prefix: Option<String>,
 }
@@ -46,7 +46,7 @@ impl EnvStorage {
     fn load_env_file(&self) -> Result<(), Error> {
         if let Some(path) = &self.env_file_path {
             dotenv::from_path(path)
-                .map_err(|e| Error::Env(format!("Failed to load env file: {}", e)))?;
+                .map_err(|e| Error::MissingEnv(format!("Failed to load env file: {}", e)))?;
         }
         Ok(())
     }
@@ -57,7 +57,7 @@ impl EnvStorage {
         <T as std::str::FromStr>::Err: std::fmt::Debug,
     {
         self.get_env_opt(key)?
-            .ok_or_else(|| Error::Env(self.format_key(key)))
+            .ok_or_else(|| Error::MissingEnv(self.format_key(key)))
     }
 
     pub fn get_env_opt<T>(&self, key: &str) -> Result<Option<T>, Error>
@@ -71,10 +71,10 @@ impl EnvStorage {
             key.to_string()
         };
 
-        let value = std::env::var(&key).map_err(|_e| Error::Env(key.clone()))?;
+        let value = std::env::var(&key).map_err(|_e| Error::MissingEnv(key.clone()))?;
         debug!("Found env: {}={}", key, value);
 
-        let value = value.parse::<T>().map_err(|e| Error::Parse {
+        let value = value.parse::<T>().map_err(|e| Error::FailedToParse {
             key: key.to_string(),
             value: value.to_string(),
             error: Some(format!("{:?}", e)),
@@ -122,11 +122,11 @@ impl EnvStorage {
         let mut file = std::fs::OpenOptions::new()
             .read(true)
             .open(self.env_file_path.as_ref().unwrap())
-            .map_err(|e| Error::Env(format!("Failed to open env file: {}", e)))?;
+            .map_err(|e| Error::MissingEnv(format!("Failed to open env file: {}", e)))?;
 
         let mut contents = String::new();
         file.read_to_string(&mut contents)
-            .map_err(|e| Error::Env(format!("Failed to read env file: {}", e)))?;
+            .map_err(|e| Error::MissingEnv(format!("Failed to read env file: {}", e)))?;
 
         let mut lines = contents.lines().collect::<Vec<_>>();
         let mut found = false;
@@ -155,10 +155,10 @@ fn overwrite_file(path: &Path, contents: &str) -> Result<(), Error> {
         .truncate(true)
         .create(true)
         .open(path)
-        .map_err(|e| Error::Env(format!("Failed to open env file: {}", e)))?;
+        .map_err(|e| Error::MissingEnv(format!("Failed to open env file: {}", e)))?;
 
     file.write_all(contents.as_bytes())
-        .map_err(|e| Error::Env(format!("Failed to write env file: {}", e)))?;
+        .map_err(|e| Error::MissingEnv(format!("Failed to write env file: {}", e)))?;
 
     Ok(())
 }

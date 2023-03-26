@@ -25,7 +25,7 @@ fn format_simple(message: &ChatMessage) -> String {
         "{} (#{}) {}: {}",
         message.sent_at.format("%Y-%m-%d %H:%M:%S"),
         message.channel,
-        message.sender,
+        message.username,
         message.message
     )
 }
