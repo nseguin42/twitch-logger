@@ -13,7 +13,7 @@ use twitch_logger::logger::db_logger::DbLogger;
 
 fn setup_logger() {
     pretty_env_logger::formatted_timed_builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init();
 }
 
