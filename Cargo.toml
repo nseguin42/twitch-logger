@@ -12,10 +12,10 @@ config = "0.13.3"
 dirs = "5.0.0"
 dotenv = "0.15.0"
 log = { version = "0.4.17", features = ["serde"] }
-tokio-postgres = { version = "0.7.7", features = ["array-impls", "with-chrono-0_4"]}
 pretty_env_logger = "0.4.0"
 serde = { version = "1.0.158", features = ["derive"] }
 serde_json = "1.0.94"
+sqlx = { version = "0.6.3", features = ["postgres", "chrono", "runtime-tokio-native-tls"] }
 tokio = { version = "1.26.0", features = ["full", "macros"] }
 twitch-irc = { version = "5.0.0", features = ["transport-tcp", "transport-tcp-native-tls", "refreshing-token-native-tls", "with-serde"] }
 

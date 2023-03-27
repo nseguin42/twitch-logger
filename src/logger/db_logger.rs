@@ -1,72 +1,60 @@
 use crate::config::Config;
 use crate::entities::chat::ChatMessage;
 use crate::error::Error;
-use tokio_postgres::types::ToSql;
-use tokio_postgres::{connect, types::Type, Client, NoTls, Statement};
+use log::{error, info};
+use sqlx::{query, Executor, PgPool, Statement};
 
 pub struct DbLogger {
-    client: Client,
+    pool: PgPool,
     table_name: String,
-    statement_create_log: Option<Statement>,
 }
 
 impl DbLogger {
-    pub async fn new(client: Client, table_name: String) -> Self {
-        let mut this = Self {
-            client,
-            table_name,
-            statement_create_log: None,
-        };
-
-        this.prepare_create_log()
-            .await
-            .expect("Could not prepare create log statement");
-        this
+    pub fn new(config: &Config, pool: PgPool) -> Self {
+        Self {
+            pool,
+            table_name: config.db_table.clone().unwrap(),
+        }
     }
 
-    async fn prepare_create_log(&mut self) -> Result<(), Error> {
-        let sql = format!(
-            "\
-            INSERT INTO {} (channel, username, message, sent_at) \
-            VALUES ($1, $2, $3, $4) \
-        ",
+    pub async fn create_log(&mut self, message: &ChatMessage) -> Result<(), Error> {
+        let query = format!(
+            "INSERT INTO {} (username, message, channel, sent_at) VALUES ($1, $2, $3, $4)",
             self.table_name
         );
-        let types = [Type::TEXT, Type::TEXT, Type::TEXT, Type::TIMESTAMPTZ];
-
-        let statement = self.client.prepare_typed(&sql, &types).await?;
-        self.statement_create_log = Some(statement);
+        sqlx::query(&query)
+            .bind(&message.username)
+            .bind(&message.message)
+            .bind(&message.channel)
+            .bind(message.sent_at)
+            .execute(&self.pool)
+            .await
+            .unwrap();
 
         Ok(())
     }
 
-    pub async fn create_log(&mut self, message: &ChatMessage) -> Result<u64, Error> {
-        if self.statement_create_log.is_none() {
-            self.prepare_create_log().await?;
+    pub async fn create_log_batch(&mut self, messages: &[ChatMessage]) -> Result<(), Error> {
+        if messages.is_empty() {
+            return Ok(());
         }
 
-        let statement = self.statement_create_log.as_ref().unwrap();
-        let params: &[&(dyn ToSql + Sync)] = &[
-            &message.channel,
-            &message.username,
-            &message.message,
-            &message.sent_at,
-        ];
-
-        let rows = self.client.execute(statement, params).await?;
-        Ok(rows)
-    }
-
-    pub async fn try_from(config: &Config) -> Result<Self, Error> {
-        let (client, connection) = connect(config.db_url.clone().unwrap().as_str(), NoTls).await?;
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
-            }
-        });
-
-        let table_name = config.db_table.clone().unwrap();
-
-        Ok(Self::new(client, table_name).await)
+        let query = format!(
+            "INSERT INTO {} (username, message, channel, sent_at) VALUES ($1, $2, $3, $4)",
+            self.table_name
+        );
+        let mut transaction = self.pool.begin().await.unwrap();
+        for message in messages {
+            sqlx::query(&query)
+                .bind(&message.username)
+                .bind(&message.message)
+                .bind(&message.channel)
+                .bind(message.sent_at)
+                .execute(&mut transaction)
+                .await
+                .unwrap();
+        }
+        transaction.commit().await.unwrap();
+        Ok(())
     }
 }

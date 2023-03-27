@@ -1,17 +1,15 @@
 #[macro_use]
 extern crate log;
 
-use twitch_irc::message::ServerMessage;
+use sqlx::PgPool;
+use tokio::spawn;
+use tokio::task::JoinError;
 use twitch_logger::client::Client;
 use twitch_logger::config::Config;
-use twitch_logger::entities::chat::ChatMessage;
 
 use twitch_logger::error::Error;
-use twitch_logger::logger::console_logger::ConsoleLogger;
+use twitch_logger::handler::MessageHandler;
 use twitch_logger::logger::db_logger::DbLogger;
-use twitch_logger::logger::file_logger::FileLogger;
-use twitch_logger::logger::value_logger::ValueLogger;
-use twitch_logger::utils::chat_message_format::ChatMessageFormat;
 
 fn setup_logger() {
     pretty_env_logger::formatted_timed_builder()
@@ -19,36 +17,41 @@ fn setup_logger() {
         .init();
 }
 
+async fn setup_db_pool(config: &Config) -> Result<PgPool, Error> {
+    let pool = PgPool::connect(&config.db_url.clone().unwrap()).await?;
+    Ok(pool)
+}
+
 #[tokio::main]
 async fn main() {
     setup_logger();
-
     let config = Config::new(None);
+    let pool = setup_db_pool(&config).await.unwrap();
+    let db_logger = DbLogger::new(&config, pool);
 
-    let mut db_logger = DbLogger::try_from(&config).await.unwrap();
-    let mut console_logger = ConsoleLogger::try_from(&config).unwrap();
-    let mut file_logger = FileLogger::try_from(&config).unwrap();
+    let (tx, rx) = tokio::sync::mpsc::channel(1024);
+    let mut handler = MessageHandler::new(&config, rx, db_logger);
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
-    tokio::spawn(async move {
-        while let Some(message) = rx.recv().await {
-            if let ServerMessage::Privmsg(msg) = message {
-                let chat_message = ChatMessage::from(msg);
-                db_logger.create_log(&chat_message).await.unwrap();
-
-                let simple = ChatMessageFormat::Simple.format(&chat_message);
-                console_logger.log(simple.as_str());
-
-                let json = ChatMessageFormat::Json.format(&chat_message);
-                file_logger.log(json.as_str());
-            }
-        }
+    let client_handle = spawn(async move {
+        let mut client = Client::try_from(&config).unwrap();
+        client.start(tx).await.unwrap();
     });
 
-    let mut client = Client::try_from(&config).unwrap();
-    client.start(tx).await.unwrap_or_else(handle_error);
+    let handler_handle = spawn(async move {
+        handler.run().await;
+    });
+
+    let result = tokio::select!(
+        client_result = client_handle => client_result,
+        handler_result = handler_handle => handler_result,
+    );
+
+    match result {
+        Ok(_) => info!("Exited."),
+        Err(err) => handle_join_error(err),
+    }
 }
 
-fn handle_error(e: Error) {
-    panic!("Error: {}", e);
+fn handle_join_error(err: JoinError) {
+    panic!("Join error: {}", err);
 }

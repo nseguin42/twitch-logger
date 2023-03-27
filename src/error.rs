@@ -1,5 +1,3 @@
-use tokio_postgres::Error as PostgresError;
-
 #[derive(Debug)]
 pub enum Error {
     MissingEnv(String),
@@ -11,7 +9,7 @@ pub enum Error {
     },
     MissingConfig(String),
     InvalidConfig(String),
-    Database(PostgresError),
+    Database(sqlx::Error),
     Unspecified,
 }
 
@@ -55,8 +53,8 @@ impl From<std::env::VarError> for Error {
     }
 }
 
-impl From<PostgresError> for Error {
-    fn from(e: PostgresError) -> Self {
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
         Error::Database(e)
     }
 }

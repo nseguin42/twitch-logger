@@ -1,7 +1,10 @@
 use crate::config::Config;
 use crate::error::Error;
 use crate::utils;
+use log::{debug, trace};
+use tokio::sync::mpsc::{Receiver, Sender};
 
+use crate::entities::chat::ChatMessage;
 use twitch_irc::login::RefreshingLoginCredentials;
 use twitch_irc::message::ServerMessage;
 use twitch_irc::TwitchIRCClient;
@@ -23,11 +26,9 @@ impl Client {
         }
     }
 
-    pub async fn start(
-        &mut self,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
-    ) -> Result<(), Error> {
+    pub async fn start(&mut self, sender: Sender<ChatMessage>) -> Result<(), Error> {
         let config = build_irc_config(self.env.clone())?;
+
         let (mut incoming_messages, irc) = TwitchIRCClient::<
             SecureTCPTransport,
             RefreshingLoginCredentials<EnvStorage>,
@@ -36,14 +37,20 @@ impl Client {
 
         let join_handle = tokio::spawn(async move {
             while let Some(message) = incoming_messages.recv().await {
-                sender.send(message).await.unwrap();
+                trace!("{:?}", message);
+                if let ServerMessage::Privmsg(msg) = message {
+                    let msg = ChatMessage::from(msg);
+                    sender.send(msg).await.unwrap();
+                }
             }
         });
 
         let irc = self.irc.as_mut().unwrap();
         for channel in &self.channels {
+            debug!("Joining channel: {}", channel);
             irc.join(channel.to_string()).unwrap();
         }
+
         join_handle.await.unwrap();
 
         Ok(())
