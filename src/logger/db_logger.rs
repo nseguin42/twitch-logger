@@ -1,8 +1,7 @@
 use crate::config::Config;
 use crate::entities::chat::ChatMessage;
 use crate::error::Error;
-use log::{error, info};
-use sqlx::{query, Executor, PgPool, Statement};
+use sqlx::PgPool;
 
 pub struct DbLogger {
     pool: PgPool,
